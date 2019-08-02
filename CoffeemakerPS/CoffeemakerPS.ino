@@ -12,13 +12,16 @@
  HC-05 bluetooth, male/female jumper wires (optional: ethernet shield, buzzer, button)
  
  The code is provided 'as is', without any guarantuee. Use at your own risk! 
+
+ Version 1.0
+ (Eisbaeeer)
 */
 
 // needed for conditional includes to work, don't ask why ;-)
 char trivialfix;
 
 // options to include into project
-//#define BUZZER 1 // piezo buzzer
+#define BUZZER 1 // piezo buzzer
 #define BUZPIN 5  // digital pin for buzzer
 //#define SERVICEBUT 8 // button to switch to service mode 
 #define BT 1 // bluetooth module
@@ -27,16 +30,16 @@ char trivialfix;
 #define DEBUG 1 // some more logging
 //#define MEMDEBUG 1 // print memory usage 
 //#define RFID 1 // stop on missing rfid reader
-#define NET 1 // include networking
-#define SYSLOG 1 // log to a log host
-#define USE_PN532 1 // pn532 as rfid reader
-//#define USE_MFRC522 1 // mfrc522 as rfid reader
+//#define NET 1 // include networking
+//#define SYSLOG 1 // log to a log host
+//#define USE_PN532 1 // pn532 as rfid reader
+#define USE_MFRC522 1 // mfrc522 as rfid reader
 
 // set your application specific settings here
-#define MASTERCARD 2754927337 // card uid to enter/exit service mode
+#define MASTERCARD 2441853729 // card uid to enter/exit service mode
 // coffemaker model
-//#define X7 1 // x7/saphira
-#define S95 1
+#define X7 // x7/saphira
+//#define S95 1
 // network configuration
 #if defined(NET)
 byte my_mac[] = { 0x90, 0xA2, 0xDA, 0x00, 0x60, 0xC5 }; // replace
@@ -75,14 +78,14 @@ String empty="";
 
 // hardware specific settings
 #if defined(LCD)
-LiquidCrystal_I2C lcd(0x20,16,2);
+LiquidCrystal_I2C lcd(0x27,16,2);
 #endif
 SoftwareSerial myCoffeemaker(2,3); // RX, TX
 #if defined(BT)
 SoftwareSerial myBT(7,6);
 #endif
 #if defined(USE_PN532)
-#define PN532_SS 9 // select pin for mfrc522
+#define PN532_SS 9 // select pin for PN532_SS
 SPISettings nfc_settings(SPI_CLOCK_DIV8, LSBFIRST, SPI_MODE0);
 PN532_SPI pn532spi(SPI, PN532_SS);
 PN532 nfc(pn532spi);
@@ -113,8 +116,22 @@ int inservice=0;
 int price=0;
 String last_product="";
 
+// no more delay
+unsigned long startMillis;  // some global variables available anywhere in the program
+unsigned long currentMillis;
+const unsigned long periode = 1000;  // one seconds
+int displ_count;
+int lcdwait;
+bool lcdshow;
+
 void setup()
 {
+
+/*--------------------------------------------------------------  
+ * Milliseconds start
+--------------------------------------------------------------*/
+  startMillis = millis();  //initial start time
+
 #if defined(SERLOG) || defined(DEBUG) || defined(MEMDEBUG)
   Serial.begin(9600);
 #endif
@@ -129,10 +146,11 @@ void setup()
 #if defined(LCD)
   lcd.init();
 #endif
-  message_print(F("sharespresso"), F("starting up"), 0);
+  message_print(F("sharespresso"), F("starting up"),2);
   myCoffeemaker.begin(9600);         // start serial communication at 9600bps
 #if defined(BT)
-  myBT.begin(38400);
+  //myBT.begin(38400);
+  myBT.begin(9600);
 #endif
   // initialized rfid lib
 #if defined(DEBUG)
@@ -179,7 +197,7 @@ void setup()
   Syslog.logger(1,5,my_fac,empty, "start");
 #endif
 #endif
-  message_print(F("Ready to brew"), F(""), 2000);
+  message_print(F("Ready to brew"), F(""),5);
 #if defined(MEMDEBUG)
   Serial.println(free_ram());
 #endif
@@ -190,6 +208,23 @@ void setup()
 
 void loop()
 {
+
+/*--------------------------------------------------------------  
+ * remove delay (one second)
+--------------------------------------------------------------*/
+  currentMillis = millis();  //get the current "time" (actually the number of milliseconds since the program started)
+  if (currentMillis - startMillis >= periode)  // Hier eine Sekunde (periode)
+  { 
+  startMillis = currentMillis;
+  displ_count++;
+  Serial.print("Display count: ");
+  Serial.println(displ_count);
+  }
+
+/*---------------------------------------------------------------
+ * end one second
+ ----------------------------------------------------------------*/
+  
 #if defined(MEMDEBUG)
   Serial.println(free_ram());
 #endif
@@ -224,9 +259,8 @@ void loop()
     if( BTstring == "RRR" ){          
       time = millis();
       beep(1);
-      message_print(F("Registering"),F("new cards"),0);
+      message_print(F("Registering"),F("new cards"),5);
       registernewcards();
-      message_clear();
     }
     // BT: Send RFID card numbers to app    
     if(BTstring == "LLL"){  // 'L' for 'list' sends RFID card numbers to app   
@@ -245,7 +279,7 @@ void loop()
       i--; // list picker index (app) starts at 1, while RFIDcards array starts at 0
       unsigned long card= EEPROM.readLong(i*6);
       int credit= EEPROM.readInt(i*6+4);      
-      message_print(print10digits(card), F("deleting"), 2000);
+      message_print(print10digits(card), F("deleting"), 5);
 #if defined(SYSLOG)
       Syslog.logger(1,5,my_fac,empty,"delete "+ print10digits(card)+ " "+ printCredit(credit));
 #endif      
@@ -270,7 +304,7 @@ void loop()
       EEPROM.writeInt(i*6+4, credit);
       beep(1);
       unsigned long card=EEPROM.readLong(i*6);
-      message_print(print10digits(card),"+"+printCredit(j),2000);
+      message_print(print10digits(card),"+"+printCredit(j), 5);
 #if defined(SYSLOG)
       Syslog.logger(1,5,my_fac,empty,"charge "+ print10digits(card)+ " "+ printCredit(j));
 #endif      
@@ -291,11 +325,10 @@ void loop()
         k++;
       }
       beep(1);
-      message_print(F("Pricelist"), F("updated!"), 2000);
+      message_print(F("Pricelist"), F("updated!"), 5);
     }
     // BT: Sends price list to app. Product 1 to 10 (0-9), prices divided by commas plus standard value for new cards
-    if(BTstring.startsWith("REA") == true){
-      // delay(100); // testweise      
+    if(BTstring.startsWith("REA") == true){   
       for (int i = 0; i < 11; i++) {
 #if defined(BT)
         price= EEPROM.readInt(1000+i*2);
@@ -362,22 +395,22 @@ void loop()
 #if defined(X7)
             case 0: productname = F("Cappuccino"); break;
             case 1: productname = F("Espresso"); break;
-            case 2: productname = F("Espresso dopio"); break;
+            case 2: productname = F("Milchkaffee"); break;
             case 3: productname = F("Milchkaffee"); break;
             case 4: productname = F("Kaffee"); break;
             case 5: productname = F("Kaffee gross"); break;
-            case 6: productname = F("Dampf links"); break;
-            case 7: productname = F("Dampf rechts"); break;
-            case 8: productname = F("Portion Milch"); break;
-            case 9: productname = F("Caffee Latte"); break;
+            case 6: productname = F("Heisswasser"); break;
+            case 7: productname = F("Dampf"); break;
+            case 8: productname = F("Kanne Kaffee"); break;
+            case 9: productname = F("Milchschaum"); break;
 #endif
           }
         price = EEPROM.readInt(product* 2+ 1000);
         last_product= String(message.charAt( 3))+ "/"+ String(product)+ " ";
-        message_print(productname, printCredit(price), 0);
+        message_print(productname, printCredit(price), 5);
       } 
       else {
-        message_print(F("Error unknown"), F("product"), 2000);
+        message_print(F("Error unknown"), F("product"), 5);
         buttonPress = false;
       }
       // boss mode, he does not pay
@@ -427,7 +460,7 @@ void loop()
         int credit= EEPROM.readInt(k*6+4);
         if(buttonPress == true){                 // button pressed on coffeemaker?
            if ((credit - price) > 0) {
-            message_print(print10digits(RFIDcard), printCredit(credit), 0);
+            message_print(print10digits(RFIDcard), printCredit(credit), 5);
             EEPROM.writeInt(k*6+4, ( credit- price));
             toCoffeemaker("?ok\r\n");            // prepare coffee
 #if defined(SYSLOG)
@@ -439,11 +472,11 @@ void loop()
           } 
           else {
             beep(2);
-            message_print(printCredit(credit), F("Not enough"), 2000); 
+            message_print(printCredit(credit), F("Not enough"), 5); 
           }
         } 
         else {                                // if no button was pressed on coffeemaker / check credit
-          message_print(printCredit(credit), F("Remaining credit"), 2000);
+          message_print(printCredit(credit), F("Remaining credit"), 5);
 #if defined(SYSLOG)
           Syslog.logger(1,5,my_fac,empty,"credit "+print10digits(RFIDcard)+" "+printCredit(credit));
 #endif
@@ -454,13 +487,28 @@ void loop()
     if (k == n){ 
       k=0; 
       beep(2);
-      message_print(String(print10digits(RFIDcard)),F("card unknown!"),2000);
+      message_print(String(print10digits(RFIDcard)),F("card unknown!"),5);
 #if defined(SYSLOG)
       Syslog.logger(1,5,my_fac,empty,"unknown "+print10digits(RFIDcard));
 #endif
     }     	    
+  delay(1000);
   }
+
+if (lcdshow == 1) {
+    if (displ_count >= lcdwait) {
+    // delay(wait);
+    displ_count = 0;
+    lcdshow = 0;
+    lcd.clear();
+    lcd.noBacklight();
+    }
 }
+
+}
+/*--------------------------------------
+ * SUB
+ */
 
 String fromCoffeemaker(){
   String inputString = "";
@@ -559,6 +607,8 @@ void serlog(String msg) {
 }
 
 void message_print(String msg1, String msg2, int wait) {
+  displ_count=0;
+  lcdwait=0;
 #if defined(SERLOG)
   if (msg1 != "") { Serial.print(msg1 + " "); }
   if (msg2 != "") { Serial.print(msg2); }
@@ -575,11 +625,8 @@ void message_print(String msg1, String msg2, int wait) {
     lcd.setCursor(0, 1);
     lcd.print(msg2);
   }
-  if (wait > 0) { 
-    delay(wait);
-    lcd.clear();
-    lcd.noBacklight();
-  }
+    lcdwait = wait;   
+    lcdshow = 1;
 #endif
 }
 
@@ -640,7 +687,7 @@ void registernewcards() {
       }
       for(int i=0;i<n;i++){
         if (RFIDcard == EEPROM.readLong(i*6)) {
-          message_print(print10digits(RFIDcard), F("already exists"), 0);
+          message_print(print10digits(RFIDcard), F("already exists"), 5);
           beep(2);
           k=254;         
           break;
@@ -650,11 +697,11 @@ void registernewcards() {
         }
       }
       if ( k == 255) {
-        message_print(F("no slot left"),F(""),0);         
+        message_print(F("no slot left"),F(""),5);         
         break;
       }
       if ( k != 254) {
-        message_print( print10digits(RFIDcard), F("registered"),0);
+        message_print( print10digits(RFIDcard), F("registered"),5);
         int credit= EEPROM.readInt(1000+2*10);
         EEPROM.updateLong(k*6, RFIDcard);
         EEPROM.updateInt(k*6+4, credit);
@@ -666,7 +713,7 @@ void registernewcards() {
       time = millis();
     }
   } while ( (millis()-time) < 10000 );
-  message_print(F("Registering"),F("ended"),2000);
+  message_print(F("Registering"),F("ended"),5);
   beep(3);  
 }
 
@@ -715,7 +762,7 @@ unsigned long nfcidread(void) {
 void servicetoggle(void){
     inservice=not(inservice);
     if ( inservice) {
-      message_print(F("Service Mode"),F("started"),0);
+      message_print(F("Service Mode"),F("started"),5);
 #if defined(SYSLOG)
       Syslog.logger(1,5,my_fac,empty,"service on");
 #endif
@@ -724,7 +771,7 @@ void servicetoggle(void){
       myBT.listen();
 #endif
     } else {
-      message_print(F("Service Mode"),F("exited"),2000);
+      message_print(F("Service Mode"),F("exited"),5);
 #if defined(SYSLOG)
       Syslog.logger(1,5,my_fac,empty,"service off");
 #endif
@@ -741,10 +788,11 @@ void inkasso_on(void){
 #endif
   if (fromCoffeemaker() == "?ok"){
     beep(1);
-    message_print(F("Inkasso mode"),F("activated!"),2000);  
+    message_print(F("Inkasso mode"),F("activated!"),5);  
+    delay(2000);
   } else {
     beep(2);
-    message_print(F("Coffeemaker"),F("not responding!"),2000);  
+    message_print(F("Coffeemaker"),F("not responding!"),5);  
   }  
 }
 
@@ -753,10 +801,11 @@ void inkasso_off(void){
   delay (100);               // wait for answer from coffeemaker
   if (fromCoffeemaker() == "?ok"){
     beep(1);
-    message_print(F("Inkasso mode"),F("deactivated!"),2000);  
+    message_print(F("Inkasso mode"),F("deactivated!"),5);
+    delay(2000);  
   } else {
     beep(2);
-    message_print(F("Coffeemaker"),F("not responding!"),2000);  
+    message_print(F("Coffeemaker"),F("not responding!"),5);
   }
 }
 
@@ -787,4 +836,3 @@ void ShowReaderDetails() {
   }
 }
 #endif
-

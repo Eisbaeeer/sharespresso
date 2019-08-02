@@ -1,3 +1,4 @@
+![Logo](pics/CardReader.jpeg)
 Sharespresso
 ============
 
@@ -36,6 +37,10 @@ http://heise.de/-3058350
 A reference for several included tools can be found here:
 https://github.com/oliverk71/Coffeemaker-Payment-System
 
+## Hardware connections
+
+![Logo](pics/CoffeeMaker.jpeg)
+
 We've used the software with two different coffemakers: x95 and
 x7. The pinout we are using:
     
@@ -58,3 +63,16 @@ pin 4 - +5V
 pin 3 - RX  
 pin 2 - GND  
 pin 1 - TX  
+
+## ToDo
+* integration of EEProm tools in main code
+* porting / extend to use ESP Wifi
+
+## ChangeLog
+
+### 1.0 (2019-08-02)
+* (Eisbaeeer)
+* fixed delay routines - no more delay
+* LCD is showing message via showlcd var - no more delay
+* changed default BT Baud rate to factory default of module - 9600
+
