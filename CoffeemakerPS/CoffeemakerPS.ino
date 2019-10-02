@@ -15,6 +15,7 @@
 
  Version 1.0
  (Eisbaeeer)
+ 20191002 - Anzeige abgebucht alter Betrag --> neuer Betrag
 */
 
 // needed for conditional includes to work, don't ask why ;-)
@@ -124,6 +125,19 @@ int displ_count;
 int lcdwait;
 bool lcdshow;
 
+// LCD char Euro
+byte customChar1[8] = {
+                  B00110,
+                  B01001,
+                  B01000,
+                  B11110,
+                  B11110,
+                  B01000,
+                  B01001,
+                  B00110
+};
+
+
 void setup()
 {
 
@@ -144,6 +158,7 @@ void setup()
   Serial.println(free_ram());
 #endif
 #if defined(LCD)
+  lcd.createChar(1, customChar1);
   lcd.init();
 #endif
   message_print(F("sharespresso"), F("starting up"),2);
@@ -460,8 +475,9 @@ void loop()
         int credit= EEPROM.readInt(k*6+4);
         if(buttonPress == true){                 // button pressed on coffeemaker?
            if ((credit - price) > 0) {
-            message_print(print10digits(RFIDcard), printCredit(credit), 5);
-            EEPROM.writeInt(k*6+4, ( credit- price));
+            int newCredit = (credit - price); // calculate new credit
+            message_print(print10digits(RFIDcard), printCredit(credit) + " --> " + printCredit(newCredit), 5);
+            EEPROM.writeInt(k*6+4, ( credit- price));   // write new credit to eeprom           
             toCoffeemaker("?ok\r\n");            // prepare coffee
 #if defined(SYSLOG)
             Syslog.logger(1,5,my_fac,empty,"sell "+ print10digits(RFIDcard)+" "+ last_product+ printCredit( price));
@@ -575,7 +591,8 @@ String printCredit(int credit){
   if (cent < 10){
     output += '0';
   }
-  output += F(" EUR");  
+  //output += F(" EUR");
+  //output += "\1"; 
   return output;
 }
 
@@ -624,6 +641,7 @@ void message_print(String msg1, String msg2, int wait) {
   if (msg2 != "") {
     lcd.setCursor(0, 1);
     lcd.print(msg2);
+    //lcd.write(byte(1));
   }
     lcdwait = wait;   
     lcdshow = 1;
